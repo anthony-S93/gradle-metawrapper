@@ -1,0 +1,50 @@
+#!/bin/sh
+
+# Is the project directory in HOME?
+if [ "${PWD#"$HOME/"}" = "$PWD" ]
+then
+    SEARCH_ENDPOINT="/"
+else
+    SEARCH_ENDPOINT="$HOME"
+fi
+
+locate_parent_directory_with_root_markers() {
+    search_dir="$PWD"
+    while [ "$search_dir" != "$SEARCH_ENDPOINT" ]
+    do
+        for marker
+        do
+            if [ -e "$search_dir/$marker" ]
+            then
+                printf '%s' "$search_dir"
+                return
+            fi
+        done
+        search_dir="$(dirname "$search_dir")"
+    done
+    printf "%s" ""
+}
+
+root_project="$(locate_parent_directory_with_root_markers 'settings.gradle' 'settings.gradle.kts')"
+
+if [ ! "$root_project" ]
+then
+    # No settings file.
+    # Can't rule out the possibility of single-project build
+    # Since settings file is optional for such builds
+    # In which case, must check for a build script
+    root_project="$(locate_parent_directory_with_root_markers 'build.gradle' 'build.gradle.kts')"
+fi
+
+if [ "$root_project" ]
+then
+    cd "$root_project" || exit
+    if [ -e "gradlew" ]
+    then
+        ./gradlew "$@"
+    else
+        echo "The gradle wrapper script doesn't exist. Run 'gradle init' first."
+    fi
+else
+    echo "Not a gradle project."
+fi
